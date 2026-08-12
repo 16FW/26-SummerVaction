@@ -1,6 +1,7 @@
 services:
   db:
     image: mysql:8.0
+    container_name: board-mysql
     environment:
       MYSQL_ROOT_PASSWORD: root_pw
       MYSQL_DATABASE: board_db
@@ -11,10 +12,49 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "board_user", "-pboard_pw"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uboard_user", "-pboard_pw"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+    networks:
+      - board-net
+
+  backend:
+    build:
+      context: ./backend
+    container_name: board-backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: board_user
+      DB_PASSWORD: board_pw
+      DB_NAME: board_db
+      FRONTEND_ORIGIN: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - board-net
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    container_name: board-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - board-net
 
 volumes:
   mysql_data:
+
+networks:
+  board-net:
+    driver: bridge
